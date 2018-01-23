@@ -94,3 +94,13 @@ func CustomRecord(metricsName string, lableMap map[string]string) {
 	}
 	Met.AddSampleWithLabels([]string{metricsName}, 1, labels)
 }
+
+/**
+* 	数据库链接数监控
+ */
+func DBConnectCount (count int, dbType string ) {
+	label := metrics.Label{Name: "dbType", Value: dbType}
+	labels := []metrics.Label{}
+	labels = append(labels, label)
+	Met.SetGaugeWithLabels([]string{"DBOpenCount"}, float32(count), labels)
+}
