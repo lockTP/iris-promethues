@@ -4,6 +4,7 @@ import (
 	prometheusSink "github.com/lockTP/go-metrics/prometheus"
 	metrics "github.com/lockTP/go-metrics"
 	"gopkg.in/kataras/iris.v5"
+	iris_context "github.com/kataras/iris/context"
 	"encoding/json"
 	"strings"
 	"strconv"
