@@ -25,10 +25,18 @@ func NewPrometheusMetrics(serviceName string) {
 * api拦截记录
  */
 func Record(ctx *iris.Context) {
+	hostStr := ctx.HostString()
+	handlerName := ctx.GetHandlerName()
+	body := ctx.Response.Body()
+	//异步记录日志
+	go ApiRecord(hostStr, handlerName, body)
+}
+
+func ApiRecord(hostStr string, handlerName string, body []byte) {
 	var result Result
 	var labelHost, labelHandleMethod, labelStatus metrics.Label
-	labelHost = metrics.Label{Name: "host", Value: ctx.HostString()}
-	handle := strings.Split(ctx.GetHandlerName(), "/")
+	labelHost = metrics.Label{Name: "host", Value: hostStr}
+	handle := strings.Split(handlerName, "/")
 	var _api []string
 	var _f []string
 	var _c string = ""
@@ -53,7 +61,7 @@ func Record(ctx *iris.Context) {
 	//接口名称
 	_interface = _system + "_" + _controller + "_" + _func
 	labelHandleMethod = metrics.Label{Name: "handleMethod", Value: _interface}
-	err := json.Unmarshal(ctx.Response.Body(), &result)
+	err := json.Unmarshal(body, &result)
 	if err != nil {//返回非合法json格式
 		labelStatus = metrics.Label{Name: "status", Value: "9999"}
 	} else {
@@ -63,6 +71,55 @@ func Record(ctx *iris.Context) {
 	labels = append(labels, labelHost, labelHandleMethod, labelStatus)
 	Met.AddSampleWithLabels([]string{"api"}, 1, labels)
 }
+
+/**
+* api拦截记录，只适用于较高版本的iris
+ */
+func Record_New(ctx iris_context.Context) {
+	var result Result
+	var labelHost, labelHandleMethod, labelStatus metrics.Label
+	labelHost = metrics.Label{Name: "host", Value: ctx.Host()}
+	handle := strings.Split(ctx.HandlerName(), "/")
+	var _api []string
+	var _f []string
+	var _c string = ""
+	var _system string = ""
+	var _controller string = ""
+	var _func string = ""
+	var _interface string = ""
+	if len(handle) >= 2 {
+		_api = strings.Split(handle[len(handle)-1], ".")
+		if len(_api) >= 2 {
+			_f = strings.Split(_api[len(_api)-1], "-")
+			_c = _api[len(_api)-2]
+		}
+		if len(_c) >= 3 {
+			_controller = _c[2 : len(_c)-1]
+		}
+		_system = strings.Replace(handle[1], "-", "_", -1)
+		if len(_f) >= 1 {
+			_func = _f[0]
+		}
+	}
+	//接口名称
+	_interface = _system + "_" + _controller + "_" + _func
+	labelHandleMethod = metrics.Label{Name: "handleMethod", Value: _interface}
+	recorder, flag := ctx.IsRecording()
+	if !flag {//未记录response body
+		labelStatus = metrics.Label{Name: "status", Value: "9998"}
+	} else {
+		err := json.Unmarshal(recorder.Body(), &result)
+		if err != nil {//返回非合法json格式
+			labelStatus = metrics.Label{Name: "status", Value: "9999"}
+		} else {
+			labelStatus = metrics.Label{Name: "status", Value: strconv.Itoa(result.Status)}
+		}
+	}
+	labels := []metrics.Label{}
+	labels = append(labels, labelHost, labelHandleMethod, labelStatus)
+	Met.AddSampleWithLabels([]string{"api"}, 1, labels)
+}
+
 
 /**
 * 	单一label记录（极简版）
